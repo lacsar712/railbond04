@@ -84,8 +84,14 @@ func WaitOccupy(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
 		return ctx.Err()
 	}
-	time.Sleep(d)
-	return ctx.Err()
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func DumpOccupancy(path, body string) error {
