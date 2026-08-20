@@ -77,6 +77,34 @@ func TestWaitOccupyHonorsCancel(t *testing.T) {
 	}
 }
 
+func TestWaitOccupyPreCancelledReturnsImmediately(t *testing.T) {
+	// Regression: a context already cancelled before the call must not sleep
+	// the full duration before releasing the bypass wait.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start := time.Now()
+	err := WaitOccupy(ctx, 600*time.Millisecond)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 250*time.Millisecond {
+		t.Fatalf("WaitOccupy slept through pre-cancel, elapsed=%s", elapsed)
+	}
+}
+
+func TestWaitOccupyCompletesWithoutCancel(t *testing.T) {
+	// Regression: the normal path (no cancel) still returns nil after the wait.
+	ctx := context.Background()
+	start := time.Now()
+	err := WaitOccupy(ctx, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("expected nil on normal completion, got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed < 50*time.Millisecond {
+		t.Fatalf("WaitOccupy returned too early, elapsed=%s", elapsed)
+	}
+}
+
 func TestDumpOccupancyPersists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "occupancy.txt")
 	body := "section=up feed=12\n"

@@ -84,7 +84,14 @@ func WaitOccupy(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
 		return ctx.Err()
 	}
-	time.Sleep(d)
+	// Select on the timer and ctx.Done() so an upstream cancel releases the
+	// bypass wait promptly instead of sleeping the full duration.
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+	case <-ctx.Done():
+	}
 	return ctx.Err()
 }
 
